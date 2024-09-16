@@ -7,7 +7,7 @@ client = Socrata("data.austintexas.gov", None)
 date_start = "2019-10-11"
 date_end = "2019-10-13"
 limit = 2000
-offset = 0
+offset = 0 # “offset” is for pagination. Although it’s set to 0 at the start, it is updated with the “limit” number of records every time the loop runs until no more records are fetched.
 data = []
 
 try:
