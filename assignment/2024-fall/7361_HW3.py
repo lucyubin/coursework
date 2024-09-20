@@ -1,3 +1,4 @@
+# Task 1
 import numpy as np
 import math
 # a function to calculate the rog of a given user
