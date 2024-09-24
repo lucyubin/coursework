@@ -108,6 +108,7 @@ print ("The runtime of the entire process is " +str(end_time - start_time)+ " se
 
 # List of different lines_per_file values
 lines_per_file_values = [20000, 30000, 40000, 50000, 60000, 70000, 80000]
+sorted_file_list=[] # without this code, the runtime constantly increase
 runtimes = []
 
 for lines_per_file in lines_per_file_values:
