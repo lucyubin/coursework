@@ -34,7 +34,7 @@ from operator import itemgetter
 import operator
 import time
 import heapq
-import matplotlib as plt
+import matplotlib.pyplot as plt
 
 #from itertools import imap
 # this file splits the large file into smaller files, and sort each smaller file based on each column defined
