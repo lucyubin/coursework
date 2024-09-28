@@ -4,6 +4,10 @@ from scipy.spatial.distance import euclidean
 from fastdtw import fastdtw
 import pandas as pd
 import itertools
+from shapely.geometry import LineString
+import geopandas as gpd
+from shapely import wkt
+import math
 
 """
 # example 1
@@ -21,7 +25,7 @@ print(distance)
 # 2.8284271247461903
 """
 
-# read data and store user id and location into a dict
+# read data and store user id and location into a dict.
 counter_user = 0
 user_coor_dict = {}  # a dictionary that stores the coordinates of all users. Key: user ID, value: a list that stores the coordinates of this user
 
@@ -119,6 +123,11 @@ largest_dtw = pd.read_csv('weibo_users_subset.txt', sep = '\t')
 largest_dtw = largest_dtw.loc[(largest_dtw['UID'] == 1045049335) | (largest_dtw['UID'] == 1074028031), :]
 largest_dtw.to_csv('largest_dtw.csv', index = False)
 
+# convert point to line
+largest_lines = largest_dtw.groupby('UID').apply(lambda row: LineString(zip(row.NEW_LON, row.NEW_LAT)))
+largest_gdf = gpd.GeoDataFrame({'UID': largest_lines.index, 'geometry': largest_lines.values}, columns = ['UID', 'geometry'])
+largest_gdf.to_file('largest_lines.shp')
+
 
 # Q3: Which two users have the smallest dtw distance value in the sample set? Plot the check-in points of these two users as polylines on a map. What spatial patterns can you observe?
 df.sort_values('dtw_dist', ascending = True) #id: 1053568140, id2: 1147562814, dtw_dist: 13867.3223354688
@@ -126,3 +135,64 @@ df.sort_values('dtw_dist', ascending = True) #id: 1053568140, id2: 1147562814, d
 smallest_dtw = pd.read_csv('weibo_users_subset.txt', sep = '\t')
 smallest_dtw = smallest_dtw.loc[(smallest_dtw['UID'] == 1053568140) | (smallest_dtw['UID'] == 1147562814), :]
 smallest_dtw.to_csv('smallest_dtw.csv', index=False)
+
+# convert point to line
+smallest_lines = smallest_dtw.groupby('UID').apply(lambda row: LineString(zip(row.NEW_LON, row.NEW_LAT)))
+smallest_gdf = gpd.GeoDataFrame({'UID': smallest_lines.index, 'geometry': smallest_lines.values}, columns = ['UID', 'geometry'])
+smallest_gdf.to_file('smallest_lines.shp')
+
+
+# Task 2. Write a python function to calculate the Euclidean distance between two trajectories
+"""
+Note that Euclidean distance only works when the two users have the same number of points in their trajectory. If the two users have a different number of points, your function should return -1
+"""
+
+def euclidean_dist(A, B):
+    if len(A) != len (B):
+        return -1
+
+    euc_list =[]
+    
+    for a, b in zip(A, B):
+        distance = np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+        euc_list.append(distance)
+
+    avrg_distance = sum(euc_list) / len(euc_list)
+    return avrg_distance
+
+"""
+# test
+A = [(0, 0),(1, 1),(2, 2)]
+B = [(0, 0),(1, 2),(3, 4)]
+C = [(0, 0), (1, 1)]
+
+print (euclidean_dist(A,B)) # 1.0786893258332633
+print (euclidean_dist(A,C)) # -1
+
+"""
+
+id1 = []
+id2 = []
+euc_list = []
+
+out_file = open("weibo_subset_euc_dist.txt", 'w')
+out_file.write("id1\tid2\teuc_dist\n")
+
+for i in range(len(user_id_pair)):
+    user_id_1 = user_id_pair[i][0] # get the first user_id from the pair
+    user_id_2 = user_id_pair[i][1] # get the second user_id from the pair
+
+    x = user_coor_dict[user_id_1] # assign the coordinate list corresponding to user_id_1 to x
+    y = user_coor_dict[user_id_2] # assign the coordinate list corresponding to user_id_2 to y
+
+    distance = euclidean_dist(x, y) # calculate euclidean distance
+
+    id1.append(user_id_1)
+    id2.append(user_id_2)
+    euc_list.append(distance)
+
+    out_file.write(f"{id1[i]}\t{id2[i]}\t{euc_list[i]}\n")
+
+# Q5 (10 pts): Out of all the user pairs, how many pairs have a valid Euclidean distance (i.e., distance other than -1)?
+euc_df = pd.read_csv('weibo_subset_euc_dist.txt', sep = '\t')
+euc_df[euc_df['euc_dist'] != -1].shape[0] #468
