@@ -143,9 +143,7 @@ smallest_gdf.to_file('smallest_lines.shp')
 
 
 # Task 2. Write a python function to calculate the Euclidean distance between two trajectories
-"""
-Note that Euclidean distance only works when the two users have the same number of points in their trajectory. If the two users have a different number of points, your function should return -1
-"""
+# Note that Euclidean distance only works when the two users have the same number of points in their trajectory. If the two users have a different number of points, your function should return -1
 
 def euclidean_dist(A, B):
     if len(A) != len (B):
@@ -168,7 +166,6 @@ C = [(0, 0), (1, 1)]
 
 print (euclidean_dist(A,B)) # 1.0786893258332633
 print (euclidean_dist(A,C)) # -1
-
 """
 
 id1 = []
