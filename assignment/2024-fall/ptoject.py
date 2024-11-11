@@ -100,14 +100,15 @@ kiosk = kiosk.drop_duplicates(subset='Kiosk Name')
 kiosk.to_csv('kiosk.csv', index = False)
 
 # Merge the 'bike_apr_2024' DataFrame with the 'kiosk' DataFrame on 'Checkout Kiosk' and 'Kiosk Name'
-merged_pre = pd.merge(bike_apr_2024, kiosk, left_on = 'Checkout Kiosk', right_on = 'Kiosk Name', how = 'left')
+merged_in = pd.merge(bike_apr_2024, kiosk, left_on = 'Checkout Kiosk', right_on = 'Kiosk Name', how = 'left')
 
 # Rename columns to distinguish between checkout and return location attributes
-merged_pre = merged_pre.rename(columns={
-    'Lat': 'co_Lat',
-    'Lon': 'co_Lon',
-    'Number of Docks' : 'co_Docs',
+merged_in = merged_in.rename(columns={
+    'Lat': 'Lat',
+    'Lon': 'Lon',
+    'Number of Docks' : 'Docs',
 })
+merged_in = merged_in[['Trip ID', 'Checkout Date', 'Checkout Time', 'Trip Duration Minutes', 'Lat', 'Lon']]
 
 # Merge the 'merged_pre' DataFrame with the 'kiosk' DataFrame again, but now using 'Return Kiosk'
 merged = pd.merge(merged_pre, kiosk, left_on = 'Return Kiosk', right_on = 'Kiosk Name', how = 'left')
