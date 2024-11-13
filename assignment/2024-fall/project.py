@@ -1,39 +1,33 @@
 # 1. Data preprocessing
 import pandas as pd
 
+### Prepare the bike data ###
 # Import bike trip data
 bike = pd.read_csv('Austin_MetroBike_Trips_20240916.csv')
 bike.head(5) # Display first 5 rows of the bike data
 
-# Select data for the year 2024
+# Select data for April 2024
 bike_2024 = bike[bike['Year'] == 2024] # 141,144 rows
 bike_2024['Month'].value_counts() # April 2024 has the most data
-
-# Select data for April 2024
 bike_apr_2024 = bike_2024[bike_2024['Month'] == 4] # 33,203 rows
+bike_apr_2024 = bike_apr_2024[['Trip ID', 'Checkout Date', 'Checkout Time', 'Checkout Kiosk', 'Return Kiosk', 'Trip Duration Minutes']] # Select relevant columns for analysis
+bike_apr_2024['Checkout Kiosk'] = bike_apr_2024['Checkout Kiosk'].str.strip() # Remove leading/trailing spaces from 'Checkout Kiosk' column
 
-# Import kiosk location data
+
+### Prepare the kiosk data for merging ###
+# Import kiosk data
 kiosk = pd.read_csv("Austin_MetroBike_Kiosk_Locations.csv") # 102 rows
+kiosk['Kiosk ID'] = kiosk['Kiosk ID'].astype('object')
 
-# Create a DataFrame with unique checkout kiosk names from the April 2024 data
+# Check unique kiosk names
 unique_bike = pd.DataFrame(sorted(bike_apr_2024['Checkout Kiosk'].unique()), columns=['Unique Checkout Kiosk'])
-
-# Create a DataFrame with unique kiosk names from the kiosk data
 unique_kiosk = pd.DataFrame(sorted(kiosk['Kiosk Name'].unique()), columns=['Unique Checkout Kiosk'])
-
-# Concatenate the two DataFrames (unique bike kiosks and unique kiosk names)
-unique_names = pd.concat([unique_bike, unique_kiosk], axis=1)
-
-# Remove leading/trailing spaces from 'Checkout Kiosk' column
-bike_apr_2024['Checkout Kiosk'] = bike_apr_2024['Checkout Kiosk'].str.strip()
-
-# Select relevant columns for analysis
-bike_apr_2024 = bike_apr_2024[['Trip ID', 'Checkout Date', 'Checkout Time', 'Checkout Kiosk', 'Return Kiosk', 'Trip Duration Minutes']]
+unique_names = pd.concat([unique_bike, unique_kiosk], axis=1) # Concatenate the two DataFrames
 
 # Replace ' & ' with '/' in the 'Kiosk Name' column of the kiosk data
 kiosk['Kiosk Name'] = kiosk['Kiosk Name'].str.replace(' & ', '/', regex=False)
 
-# Create a dictionary for specific replacements in the 'Kiosk Name' column
+# Replace 'Kiosk Name' column using the dictionary
 replacement_dict = {
     'Capitol Station / Congress/11th' : '11th/Congress @ The Texas Capitol',
     'State Capitol Visitors Garage @ San Jacinto/12th' : '12th/San Jacinto @ State Capitol Visitors Garage',
@@ -78,12 +72,10 @@ replacement_dict = {
     'Sterzing at Barton Springs' : 'Sterzing/Barton Springs',
     'MoPac Pedestrian Bridge @ Veterans Drive' : 'Veterans/Atlanta @ MoPac Ped Bridge'
 }
-
-# Replace the specific values in the 'Kiosk Name' column using the dictionary
 kiosk['Kiosk Name'] = kiosk['Kiosk Name'].replace(replacement_dict)
 
 # Select specific columns from the 'kiosk' DataFrame
-kiosk = kiosk[['Kiosk Name', 'Lat', 'Lon', 'Number of Docks']]
+kiosk = kiosk[['Kiosk ID', 'Kiosk Name', 'Lat', 'Lon', 'Number of Docks']]
 
 # Create a DataFrame with additional kiosk information to add
 add_kiosk = pd.DataFrame({
@@ -93,32 +85,182 @@ add_kiosk = pd.DataFrame({
 })
 
 # Concatenate the new kiosks (add_kiosk) to the existing kiosk DataFrame
-kiosk = pd.concat([kiosk, add_kiosk], ignore_index=True) # 104 rows
+kiosk = pd.concat([kiosk, add_kiosk], ignore_index=True) # 105 rows
+
+# 'Number of Docks' retrieved from the Bikeshare app and assign 'Kiosk ID'
+kiosk.loc[kiosk['Kiosk Name'] == '3rd/Nueces', ['Number of Docks', 'Kiosk ID']] = [8, 2]
+kiosk.loc[kiosk['Kiosk Name'] == '6th/Lavaca', ['Number of Docks', 'Kiosk ID']] = [6, 3]
+kiosk.loc[kiosk['Kiosk Name'] == 'Dean Keeton/Park Place', ['Number of Docks', 'Kiosk ID']] = [13, 4]
+kiosk.loc[kiosk['Kiosk Name'] == 'East 7th/Pleasant Valley', ['Number of Docks', 'Kiosk ID']] = [8, 5]
+kiosk.loc[kiosk['Kiosk Name'] == 'One Texas Center', ['Number of Docks', 'Kiosk ID']] = [13, 6]
+
+# Remove rows without dock information in the Bikeshare app
+kiosks_to_remove = [
+    '23rd/Pearl',
+    '5th/San Marcos',
+    '6th/Navasota St.',
+    '8th/Guadalupe',
+    'ACC - West/12th Street',
+    'Bullock Museum @ Congress/MLK',
+    'OFFICE/Main/Shop/Repair',
+    'Pease Park',
+    'Rainey @ River St',
+    'Red River/LBJ Library',
+    'Republic Square',
+    'Rio Grande/12th',
+    'State Capitol @ 14th/Colorado',
+    'State Parking Garage @ Brazos/18th',
+    'Toomey Rd @ South Lamar',
+    'Waller/6th St.',
+    'Zilker Park West'
+]
+
+# Remove rows where 'Kiosk Name' matches any in the list
+kiosk = kiosk[~kiosk['Kiosk Name'].isin(kiosks_to_remove)] # 88 rows
 
 # Drop duplicates based on the 'Kiosk Name' column to keep unique kiosks only
-kiosk = kiosk.drop_duplicates(subset='Kiosk Name')
+kiosk = kiosk.drop_duplicates(subset='Kiosk Name') # 86 rows
 kiosk.to_csv('kiosk.csv', index = False)
 
-# Merge the 'bike_apr_2024' DataFrame with the 'kiosk' DataFrame on 'Checkout Kiosk' and 'Kiosk Name'
-merged_in = pd.merge(bike_apr_2024, kiosk, left_on = 'Checkout Kiosk', right_on = 'Kiosk Name', how = 'left')
 
-# Rename columns to distinguish between checkout and return location attributes
-merged_in = merged_in.rename(columns={
-    'Lat': 'Lat',
-    'Lon': 'Lon',
-    'Number of Docks' : 'Docs',
-})
-merged_in = merged_in[['Trip ID', 'Checkout Date', 'Checkout Time', 'Trip Duration Minutes', 'Lat', 'Lon']]
+### Merge bike and kiosk data ###
+merged_co = pd.merge(bike_apr_2024, kiosk, left_on = 'Checkout Kiosk', right_on = 'Kiosk Name') # 32,035 rows
+merged_co = merged_co[['Checkout Date', 'Checkout Time', 'Checkout Kiosk', 'Kiosk ID', 'Number of Docks']]
 
-# Merge the 'merged_pre' DataFrame with the 'kiosk' DataFrame again, but now using 'Return Kiosk'
-merged = pd.merge(merged_pre, kiosk, left_on = 'Return Kiosk', right_on = 'Kiosk Name', how = 'left')
-
-# Rename columns to distinguish return location attributes
-merged = merged.rename(columns={
-    'Lat': 'rt_Lat',
-    'Lon': 'rt_Lon',
-    'Number of Docks' : 'rt_Docs',
+# Rename columns
+merged_co = merged_co.rename(columns={
+    'Kiosk ID': 'CO ID',
+    'Number of Docks': 'CO Docks',
 })
 
-# Drop duplicate 'Kiosk Name' columns generated during the merge process
-merged = merged.drop(columns=['Kiosk Name_x', 'Kiosk Name_y'])
+merged_rt = pd.merge(bike_apr_2024, kiosk, left_on = 'Return Kiosk', right_on = 'Kiosk Name', how = 'left')
+merged_rt = merged_rt[['Return Kiosk', 'Kiosk ID', 'Number of Docks']]
+merged_rt = merged_rt.rename(columns={
+    'Kiosk ID': 'RT ID',
+    'Number of Docks': 'RT Docks',
+})
+
+merged_df = pd.concat([merged_co, merged_rt], axis=1)
+
+
+### Split the data into weekday and weekend ###
+merged_df['Checkout Date'] = pd.to_datetime(merged_df['Checkout Date']) # convert to date type
+merged_df['Day of Week'] = merged_df['Checkout Date'].dt.weekday # assign weekday and weekend
+
+weekday_df = merged_df[merged_df['Day of Week'] < 5]
+weekday_df = weekday_df.dropna(subset=['CO ID', 'RT ID']) # select weekday 22,662 rows
+
+weekend_df = merged_df[merged_df['Day of Week'] >= 5] 
+weekend_df = weekend_df.dropna(subset=['CO ID', 'RT ID']) # select weekend 8,074 rows
+
+weekday_df.to_csv('weekday_df.csv', index = False)
+weekend_df.to_csv('weekend_df.csv', index = False)
+
+
+########################################################################################################################
+
+# 2. Identify communities
+from collections import Counter
+import pandas as pd
+
+def count_flow(infile, col1, col2, outfile):
+    flow_count_dict = {} # Create a dictionary to store counts of flows between zone pairs
+    id_list = [] # Create a list to store unique zone IDs
+    bigfile = open(infile) # Open file
+    bigfile.readline() # Skip the header
+    for lineno, line in enumerate(bigfile):
+        # If the value in column col1 is empty, return the id_list and flow_count_dict
+        if line.split(',')[col1] == '':
+            return id_list, flow_count_dict
+
+        # Get the zone1_id and zone2_id
+        zone1_id = int(line.split(',')[col1])
+        zone2_id = int(line.split(',')[col2])
+        
+        # Skip if the zone1_id and zone2_id are the same
+        if zone1_id == zone2_id:
+            continue
+        
+        # Add zone1_id and zone2_id to id_list if it isn't already present
+        if zone1_id not in id_list:
+            id_list.append(zone1_id)
+        if zone2_id not in id_list:
+            id_list.append(zone2_id)
+        
+        # Create pairs of zone1 and zone2
+        zone_pair = (zone1_id, zone2_id)
+        zone_pair_reverse = (zone2_id, zone1_id)
+
+        # Add the flow count for each zone pair
+        if zone_pair in flow_count_dict:
+            flow_count_dict[zone_pair] += 1
+        elif zone_pair_reverse in flow_count_dict:
+            flow_count_dict[zone_pair_reverse] += 1
+        else:
+            flow_count_dict[zone_pair] = 1 # Assign 1 if the zone pair doesn't exist
+
+        # Print the line number
+        print(str(lineno)) 
+
+    # Export outfile
+    with open(outfile, "w") as output:
+        for k, v in flow_count_dict.items():
+            output.write(str(k) + '\t' + str(v) + '\n')
+    return id_list, flow_count_dict
+
+# Analyze data
+col1 = 3  # checkout kiosk id
+col2 = 6  # return kiosk id
+infile = "weekday_df.csv"
+outfile = "weekday_df.txt"
+result = count_flow(infile, col1, col2, outfile)
+
+# Creat a dataframe from outfile
+result_list = result[1]
+result_df = pd.DataFrame(list(result_list.items()), columns=['Points', 'Value'])
+result_df[['id1', 'id2']] = pd.DataFrame(result_df['Points'].tolist(), index=result_df.index)
+result_df = result_df[['id1', 'id2', 'Value']]
+
+# Sort ascending or descending frequency by Value
+result_df.sort_values(by='Value', ascending=False)
+
+# analyze community detection
+import igraph as ig
+from igraph import *
+from functools import reduce # Python3
+
+# Get vertices and flow_count_dict by using count_flow function
+vertices, flow_count_dict = count_flow(infile, col1, col2, outfile)
+
+g = Graph(directed=False) # Create an undirected graph
+
+# Create lists to store edge and weight
+edge_list = []
+weight_list = []
+
+# Add the edge and weight lists
+for k, v in flow_count_dict.items():
+    edge_list.append(k)
+    weight_list.append(v)
+
+g.add_vertices(vertices) # Add the vertices to graph
+
+# Convert zone pairs in edge_list to vertex indices in edge_list_index
+edge_list_index = []
+for pair in edge_list:
+    # Find the index of each zone in the vertices list and add the pair of indices to edge_list_index
+    edge_list_index.append((vertices.index(pair[0]),vertices.index(pair[1])))
+g.add_edges(edge_list_index)
+
+# Assign weight and label the weight
+g.es['weight'] = weight_list
+g.es['label'] = weight_list
+
+# Detect community using multilevel methodology
+community = g.community_multilevel(weights = weight_list)
+print(community.membership)
+
+# Write a result file
+with open("community_weekday.txt", "w") as output: # remember to change this file name for May data
+    for i in range (len(vertices)):
+        output.write(str(vertices[i]) +'\t'+ str(community.membership[i])+'\n')
