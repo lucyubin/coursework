@@ -264,3 +264,7 @@ print(community.membership)
 with open("community_weekday.txt", "w") as output: # remember to change this file name for May data
     for i in range (len(vertices)):
         output.write(str(vertices[i]) +'\t'+ str(community.membership[i])+'\n')
+
+########################################################################################################################
+
+# Accessibility
