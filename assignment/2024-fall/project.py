@@ -323,6 +323,6 @@ pop_buffer['spar'] = pop_buffer['sfca'] / pop_buffer['sfca'].mean()
 
 # Join 2SFCA value to census tract shp file
 census_tract = gpd.read_file('census_tract.shp')
-spar = pop_buffer[['pop_name', 'POP', 'sfca', 'spar', 'geometry']].merge(census_tract['Name_12'], left_on='pop_name', right_on='Name_12', how='right')
+spar = census_tract[['Name_12', 'geometry']].merge(pop_buffer[['pop_name', 'POP', 'sfca', 'spar']], left_on='Name_12', right_on='pop_name', how='left')
 spar.drop(columns=['Name_12'], inplace=True)
 spar.to_file('spar.shp')
