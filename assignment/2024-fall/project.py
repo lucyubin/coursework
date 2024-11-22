@@ -268,3 +268,61 @@ with open("community_weekday.txt", "w") as output: # remember to change this fil
 ########################################################################################################################
 
 # Accessibility
+import geopandas as gpd
+import networkx as nx
+from shapely.geometry import LineString, Point
+
+# STEP 1
+# Import kiosk point
+kiosk_point = gpd.read_file('kiosk_point.shp') # 86 rows
+
+# Import kiosk buffer
+kiosk_buffer = gpd.read_file('kiosk_SA.shp')
+kiosk_buffer['name'] = [name.split(' :')[0] for name in kiosk_buffer['Name']]
+kiosk_buffer['name'] = kiosk_buffer['name'].astype(str)
+kiosk_point['Kiosk ID'] = kiosk_point['Kiosk ID'].astype(str)
+
+# Join kiosk to kiosk buffer
+kiosk_buffer = gpd.GeoDataFrame(kiosk_buffer[['name', 'geometry']]).merge(kiosk_point[['Kiosk ID', 'Kiosk Name', 'Number of']], left_on='name', right_on='Kiosk ID', how='inner')
+kiosk_buffer = gpd.GeoDataFrame(kiosk_buffer, geometry='geometry')
+
+# Import population
+census_point = gpd.read_file('census_tract_point.shp') # 311 rows
+census_point = census_point.to_crs(kiosk_buffer.crs)
+#census_point = census_point.to_crs(fac_buffer.crs)
+
+# Spatial join
+result = gpd.sjoin(kiosk_buffer, census_point, how="inner", predicate="intersects") 
+sum_pop_rate = result.groupby('name')['POP'].sum().reset_index()
+sum_pop_rate.rename(columns={'POP': 'pop_sum'}, inplace=True)
+kiosk_buffer['pop_sum'] = kiosk_buffer['name'].map(sum_pop_rate.set_index('name')['pop_sum']).fillna(0)
+
+# Join kiosk buffer to kiosk
+kiosk_point = gpd.GeoDataFrame(kiosk_buffer[['name', 'pop_sum']]).merge(kiosk_point[['Kiosk ID', 'Number of', 'geometry']], left_on='name', right_on='Kiosk ID', how='inner')
+kiosk_point = gpd.GeoDataFrame(kiosk_point, geometry='geometry')
+
+
+# Step 2
+
+# Import pop buffer
+pop_buffer = gpd.read_file('census_tract_SA.shp')
+pop_buffer['pop_name'] = [name.split(' :')[0] for name in pop_buffer['Name']]
+
+# Join pop to pop buffer
+pop_buffer = pop_buffer[['pop_name', 'geometry']].merge(census_point[['Name_12', 'POP']], left_on='pop_name', right_on='Name_12', how='inner')
+pop_buffer.drop(columns=['Name_12'], inplace=True)
+
+# Spatial join
+result = gpd.sjoin(pop_buffer, kiosk_point, how="inner", predicate="intersects") 
+sum_ProToPop = result.groupby('pop_name')['pop_sum'].sum().reset_index()
+sum_ProToPop.rename(columns={'pop_sum': 'sfca'}, inplace=True)
+pop_buffer['sfca'] = pop_buffer['pop_name'].map(sum_ProToPop.set_index('pop_name')['sfca']).fillna(0)
+
+# Divide by mean
+pop_buffer['spar'] = pop_buffer['sfca'] / pop_buffer['sfca'].mean()
+
+# Join 2SFCA value to census tract shp file
+census_tract = gpd.read_file('census_tract.shp')
+spar = pop_buffer[['pop_name', 'POP', 'sfca', 'spar', 'geometry']].merge(census_tract['Name_12'], left_on='pop_name', right_on='Name_12', how='right')
+spar.drop(columns=['Name_12'], inplace=True)
+spar.to_file('spar.shp')
