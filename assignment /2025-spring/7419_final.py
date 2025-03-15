@@ -6,7 +6,7 @@ from pyproj import Transformer
 import osmnx as ox
 
 # Network dataset path
-network_dataset = r"C:\Users\YUBIN\OneDrive - Texas State University\2025 Spring\7419 ADV TECHNIQ IN GISCIENCE\final_project\network.gdb\SM_walk\SM_walk_network"
+network_dataset = r"*\final_project\network.gdb\SM_walk\SM_walk_network"
 
 # 1️. Build the network dataset
 arcpy.na.BuildNetwork(network_dataset)
@@ -46,7 +46,7 @@ arcpy.na.AddLocations(layer_name, "Stops", stops_fc, search_tolerance="500 Meter
 arcpy.na.Solve(layer_name)
 
 # 8️. Save the results
-output_fc = r"C:\Users\YUBIN\OneDrive - Texas State University\2025 Spring\7419 ADV TECHNIQ IN GISCIENCE\final_project\network.gdb\ShortestRoute"
+output_fc = r"*\final_project\network.gdb\ShortestRoute"
 if arcpy.Exists(output_fc):
     arcpy.management.Delete(output_fc)
 arcpy.management.CopyFeatures(layer_name + "/Routes", output_fc)
