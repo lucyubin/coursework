@@ -14,7 +14,7 @@ def run_path_analysis(start_lon, start_lat, end_lon, end_lat,
     normal_network = os.path.join(base_gdb, "SM_walk", "SM_walk_network")
     slope_network = os.path.join(base_gdb, "SlopeNetwork", "SlopeNetwork_ND")
 
-    # ✅ Option 3: Slope
+    # Option 3: Slope
     if option_3_slope:
         network_dataset = slope_network
         impedance = "SlopePenalty"
@@ -122,3 +122,14 @@ def run_path_analysis(start_lon, start_lat, end_lon, end_lat,
 
     arcpy.management.CopyFeatures(layer_name + "/Routes", result_fc)
     print(f"Route saved to {result_fc}")
+
+# test
+run_path_analysis(
+    start_lon=-97.94317097459997,
+    start_lat=29.888964674582034,
+    end_lon=-97.93888748676122,
+    end_lat=29.889432090088107,
+    option_1_shade=True,
+    option_2_gate=True,
+    option_3_slope=True
+)
