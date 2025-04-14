@@ -1,3 +1,17 @@
+"""
+Title: Campus Shortest Path Analysis Tool
+Description: This script calculates the shortest walking route on a university campus,
+             with optional considerations for shaded areas, indoor gate access, and slope.
+
+Authors:
+    - Yubin Lee
+    - Jong-Ku Park
+    - Neelam Thapa Magar
+
+Created: 2025-04-14
+Last Updated: 2025-04-14
+"""
+
 import arcpy
 from arcpy.sa import *
 import os
