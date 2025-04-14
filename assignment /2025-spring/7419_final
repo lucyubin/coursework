@@ -1,0 +1,124 @@
+import arcpy
+from arcpy.sa import *
+import os
+
+arcpy.env.overwriteOutput = True
+arcpy.CheckOutExtension("Spatial")
+
+def run_path_analysis(start_lon, start_lat, end_lon, end_lat,
+                      option_1_shade=False, option_2_gate=False, option_3_slope=False):
+    # =============================
+    # Set paths
+    # =============================
+    base_gdb = r"D:\final_project\network.gdb"
+    normal_network = os.path.join(base_gdb, "SM_walk", "SM_walk_network")
+    slope_network = os.path.join(base_gdb, "SlopeNetwork", "SlopeNetwork_ND")
+
+    # ✅ Option 3: Slope
+    if option_3_slope:
+        network_dataset = slope_network
+        impedance = "SlopePenalty"
+        result_name = "ShortestRouteSlope"
+    else:
+        network_dataset = normal_network
+        impedance = "Length"
+        result_name = "ShortestRoute"
+
+    layer_name = "RouteLayer"
+    if arcpy.Exists(layer_name):
+        arcpy.management.Delete(layer_name)
+
+    # =============================
+    # Create Route Analysis Layer
+    # =============================
+    arcpy.na.MakeRouteAnalysisLayer(network_dataset, layer_name, impedance)
+    sublayers = arcpy.na.GetNAClassNames(layer_name)
+    stops_layer_path = f"{layer_name}/{sublayers['Stops']}"
+
+    # =============================
+    # Set start and end points
+    # =============================
+    stops = [("Start", start_lon, start_lat), ("End", end_lon, end_lat)]
+    memory_fc = "memory/stops"
+    if arcpy.Exists(memory_fc):
+        arcpy.management.Delete(memory_fc)
+
+    arcpy.management.CreateFeatureclass("memory", "stops", "POINT", spatial_reference=4326)
+    arcpy.management.AddField(memory_fc, "Name", "TEXT")
+
+    with arcpy.da.InsertCursor(memory_fc, ["Name", "SHAPE@XY"]) as cursor:
+        for name, lon, lat in stops:
+            cursor.insertRow((name, (lon, lat)))
+
+    arcpy.na.AddLocations(layer_name, "Stops", memory_fc, search_tolerance="500 Meters")
+
+    # =============================
+    # Option 1: Shade handling
+    # =============================
+    if option_1_shade:
+        print("Processing Option 1: Shade...")
+        dsm = r"D:\final_project\shade\sm.tif"
+        shadow_raster = Hillshade(dsm, azimuth=120, altitude=35, model_shadows="SHADOWS")
+        shadow_mask = Con(shadow_raster < 50, 1)
+        shadow_poly = os.path.join(base_gdb, "shadow_polygon")
+        shadow_raster.save(os.path.join(base_gdb, "shade", "sm_shadow.tif"))
+
+        arcpy.conversion.RasterToPolygon(shadow_mask, shadow_poly, simplify="NO_SIMPLIFY")
+
+        edge_fc = os.path.join(base_gdb, "SM_walk", "san_marcos_walk_edges")
+        if "is_shaded" not in [f.name for f in arcpy.ListFields(edge_fc)]:
+            arcpy.management.AddField(edge_fc, "is_shaded", "SHORT")
+
+        shadow_joined = os.path.join(base_gdb, "shadow_joined_edges")
+        if arcpy.Exists(shadow_joined):
+            arcpy.management.Delete(shadow_joined)
+
+        arcpy.analysis.SpatialJoin(
+            target_features=edge_fc,
+            join_features=shadow_poly,
+            out_feature_class=shadow_joined,
+            join_type="KEEP_ALL",
+            match_option="INTERSECT"
+        )
+
+        with arcpy.da.UpdateCursor(shadow_joined, ["Join_Count", "is_shaded"]) as cursor:
+            for join_count, _ in cursor:
+                cursor.updateRow((join_count, 1 if join_count > 0 else 0))
+
+    # =============================
+    # Option 2: Gate handling
+    # =============================
+    if option_2_gate:
+        print("Processing Option 2: Gate...")
+        gate_fc = r"D:\final_project\building_gates.shp"
+        output_edge_fc = "memory/BuildingEdges"
+        if arcpy.Exists(output_edge_fc):
+            arcpy.management.Delete(output_edge_fc)
+
+        arcpy.management.CreateFeatureclass("memory", "BuildingEdges", "POLYLINE", spatial_reference=4326)
+        building_dict = {}
+        with arcpy.da.SearchCursor(gate_fc, ["BldgID", "SHAPE@XY"]) as cursor:
+            for bldg_id, coord in cursor:
+                building_dict.setdefault(bldg_id, []).append(coord)
+
+        with arcpy.da.InsertCursor(output_edge_fc, ["SHAPE@"]) as cursor:
+            for coords in building_dict.values():
+                if len(coords) >= 2:
+                    for i in range(len(coords)):
+                        for j in range(i + 1, len(coords)):
+                            array = arcpy.Array([arcpy.Point(*coords[i]), arcpy.Point(*coords[j])])
+                            polyline = arcpy.Polyline(array)
+                            cursor.insertRow([polyline])
+        print("Gate edges created. (Merge with network manually if needed)")
+
+    # =============================
+    # Solve and save results
+    # =============================
+    arcpy.na.Solve(layer_name)
+
+    result_fc = os.path.join(base_gdb, result_name)
+    if arcpy.Exists(result_fc):
+        arcpy.management.Delete(result_fc)
+
+    arcpy.management.CopyFeatures(layer_name + "/Routes", result_fc)
+    print(f"Route saved to {result_fc}")
