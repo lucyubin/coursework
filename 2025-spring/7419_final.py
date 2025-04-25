@@ -25,8 +25,8 @@ arcpy.CheckOutExtension("Network")
 
 def assign_gate(input_network_fc, gate_fc, output_fc):
     """
-    Adds internal gate-to-gate edges between gates of the same building and merges with existing network.
-    Adds 'internal' field: 1 for internal gate edge, 0 for original edges.
+    Adds internal gate-to-gate edges between gates of the same building and merges with the existing network.
+    Adds "internal"=1 for internal gate edge, "internal"=0 for original edges.
 
     Parameters:
     - input_network_fc: Existing edge feature class (e.g., walk_edge)
@@ -39,11 +39,14 @@ def assign_gate(input_network_fc, gate_fc, output_fc):
     # 1. Get spatial reference
     spatial_ref = arcpy.Describe(gate_fc).spatialReference
 
-    # 2. Create in-memory feature class for gate-to-gate edges
+    # 2. Create an in-memory feature class for gate-to-gate edges
     gate_edges_fc = "memory/gate_edges"
+    
+    # Delete the feature class if it already exists to avoid conflicts
     if arcpy.Exists(gate_edges_fc):
         arcpy.management.Delete(gate_edges_fc)
-
+        
+    # Create a new polyline feature class in memory with the same spatial reference
     arcpy.management.CreateFeatureclass(
         out_path="memory",
         out_name="gate_edges",
@@ -51,7 +54,7 @@ def assign_gate(input_network_fc, gate_fc, output_fc):
         spatial_reference=spatial_ref
     )
 
-    # 3. Add 'internal' field only
+    # 3. Add "internal" field
     if "internal" not in [f.name.lower() for f in arcpy.ListFields(gate_edges_fc)]:
         arcpy.management.AddField(gate_edges_fc, "internal", "SHORT")
 
@@ -72,13 +75,15 @@ def assign_gate(input_network_fc, gate_fc, output_fc):
                     line = arcpy.Polyline(arcpy.Array([arcpy.Point(*pt1), arcpy.Point(*pt2)]), spatial_ref)
                     cursor.insertRow([line, 1])
 
-    # 6. Copy input network and ensure 'internal' field = 0
+    # 6. Copy input network and assign "internal"=0
     temp_fc = "memory/temp_network"
     arcpy.management.CopyFeatures(input_network_fc, temp_fc)
 
+    # Add the "internal" field if it doesn't exist
     if "internal" not in [f.name.lower() for f in arcpy.ListFields(temp_fc)]:
         arcpy.management.AddField(temp_fc, "internal", "SHORT")
 
+    # Set the "internal" field to 0 for all existing edges
     with arcpy.da.UpdateCursor(temp_fc, ["internal"]) as cursor:
         for row in cursor:
             row[0] = 0
@@ -101,8 +106,8 @@ assign_gate(
 
 def assign_slope(edge_fc, slope_fc, output_fc, slope_field="slope"):
     """
-    Creates a new feature class where the 'slope' field is set to 1 for edges that intersect
-    slope polylines, and 0 otherwise. The original edge_fc is left unchanged.
+    Create a new feature class where the "slope"=1 for edges intersecting slope polylines, 
+    and "slope"=0 otherwise. The original edge_fc is left unchanged.
 
     Parameters:
     - edge_fc: Input polyline feature class (network edges)
@@ -118,7 +123,7 @@ def assign_slope(edge_fc, slope_fc, output_fc, slope_field="slope"):
         arcpy.management.Delete(output_fc)
     arcpy.management.CopyFeatures(edge_fc, output_fc)
 
-    # 2: Add 'slope' field to output_fc if not exists
+    # 2: Add "slope" field to output_fc if it does not exist
     if slope_field not in [f.name for f in arcpy.ListFields(output_fc)]:
         arcpy.management.AddField(output_fc, slope_field, "SHORT")
 
@@ -132,7 +137,7 @@ def assign_slope(edge_fc, slope_fc, output_fc, slope_field="slope"):
         match_option="INTERSECT"
     )
 
-    # 4: Assign slope = 1 if intersects, else 0
+    # 4: Assign "slope=1" if intersects, else "slope=0"
     with arcpy.da.UpdateCursor(joined_fc, ["Join_Count", slope_field]) as cursor:
         for join_count, _ in cursor:
             cursor.updateRow((join_count, 1 if join_count > 0 else 0))
@@ -141,10 +146,12 @@ def assign_slope(edge_fc, slope_fc, output_fc, slope_field="slope"):
     oid_field = arcpy.Describe(output_fc).OIDFieldName
     joined_dict = {}
 
+    # Get the name of the Object ID field
     with arcpy.da.SearchCursor(joined_fc, [oid_field, slope_field]) as cursor:
         for oid, val in cursor:
             joined_dict[oid] = val
 
+    # Update the original output feature class with the slope values (1 or 0)
     with arcpy.da.UpdateCursor(output_fc, [oid_field, slope_field]) as cursor:
         for oid, _ in cursor:
             val = joined_dict.get(oid, 0)
@@ -164,7 +171,7 @@ assign_slope(
 
 def assign_shade(edge_fc, dsm_raster, output_fc, azimuth=247, altitude=36, shade_field="shade"):
     """
-    Generates shadow polygon from DSM where pixel value = 0 and assigns shade=1 to edges intersecting shadow.
+    Generates a shadow polygon from the DSM where pixel value is zero and assigns "shade"=1 to edges intersecting the shadow.
     Writes results to a new feature class (output_fc), leaves original edge_fc unchanged.
 
     Parameters:
@@ -187,13 +194,13 @@ def assign_shade(edge_fc, dsm_raster, output_fc, azimuth=247, altitude=36, shade
         model_shadows="SHADOWS"
     )
 
-    # Optional: Save hillshade raster to visually inspect shadow values
+    # Optional: Save hillshade raster to inspect shadow values visually
     # hillshade_raster.save(r"D:\CampusPath\network.gdb\hillshade_output")
 
     # 2. Mask for shaded areas (only pixel value = 0 is shadow)
     shadow_mask = Con(hillshade_raster == 0, 1)
 
-    # 3. Convert mask to polygon
+    # 3. Convert the mask to a polygon
     shadow_poly = "memory/shade_polygon"
     arcpy.conversion.RasterToPolygon(
         in_raster=shadow_mask,
@@ -206,7 +213,7 @@ def assign_shade(edge_fc, dsm_raster, output_fc, azimuth=247, altitude=36, shade
         arcpy.management.Delete(output_fc)
     arcpy.management.CopyFeatures(edge_fc, output_fc)
 
-    # 5. Add 'shade' field if missing
+    # 5. Add "shade" field if missing
     if shade_field not in [f.name for f in arcpy.ListFields(output_fc)]:
         arcpy.management.AddField(output_fc, shade_field, "SHORT")
 
@@ -220,18 +227,22 @@ def assign_shade(edge_fc, dsm_raster, output_fc, azimuth=247, altitude=36, shade
         match_option="INTERSECT"
     )
 
-    # 7. Update shade field in joined feature class
+    # 7. Update the shade field in the joined feature class
     with arcpy.da.UpdateCursor(shadow_joined, ["Join_Count", shade_field]) as cursor:
         for join_count, _ in cursor:
             cursor.updateRow((join_count, 1 if join_count > 0 else 0))
 
-    # 8. Transfer updated 'shade' values back to output_fc
+    # 8. Transfer updated "shade" values back to output_fc
+    # Get the Object ID field name from the output feature class
     oid_field = arcpy.Describe(output_fc).OIDFieldName
+    
+    # Create a dictionary to store "shade" values from the spatially joined feature class
     shade_dict = {}
     with arcpy.da.SearchCursor(shadow_joined, [oid_field, shade_field]) as cursor:
         for oid, val in cursor:
             shade_dict[oid] = val
 
+    # Update the output feature class with "shade" values (1 if shaded, 0 otherwise)
     with arcpy.da.UpdateCursor(output_fc, [oid_field, shade_field]) as cursor:
         for oid, _ in cursor:
             cursor.updateRow((oid, shade_dict.get(oid, 0)))
@@ -303,16 +314,25 @@ def run_impedance_route(
         for row in cursor:
             slope_val, shade_val, internal_val, length = row[:4]
 
+            # If gate usage is disabled and the edge is internal, exclude it from analysis
             if not use_gate and internal_val == 1:
                 row[4] = None  # exclude gate edges if gate=False
             else:
                 penalty_factor = 1.0
+                
+                # Apply slope weight if slope is present and slope is being considered
                 if use_slope and slope_val == 1:
                     penalty_factor *= slope_weight
+                
+                # Apply shade weight if shade is present and shade is being considered
                 if use_shade and shade_val == 1:
                     penalty_factor *= shade_weight
+                
+                # Apply gate weight if the internal edge is present and gates are being considered
                 if use_gate and internal_val == 1:
                     penalty_factor *= gate_weight
+                
+                # Calculate and assign the impedance value
                 row[4] = length * penalty_factor
             cursor.updateRow(row)
 
