@@ -1,10 +1,12 @@
 """
-Title: Campus Shortest Path Analysis Tool
+Title: Campus Shortest Path Analysis Tool (CampusPath)
 Description: This script calculates the shortest walking route on a university campus,
              with optional considerations for shaded areas, indoor gate access, and slope.
-
+Authors: Yubin Lee
+         Jong-Ku Park
+         Neelam Thapa Magar
 Created: 2025-04-14
-Last Updated: 2025-04-25
+Last Updated: 2025-04-27
 """
 
 import arcpy
@@ -14,7 +16,7 @@ from arcpy.sa import Hillshade
 from sympy import false
 
 # Set environment
-arcpy.env.workspace = r"D:/CampusPath/network.gdb"
+arcpy.env.workspace = r"D:\CampusPath\network.gdb"
 arcpy.env.overwriteOutput = True
 arcpy.CheckOutExtension("Spatial")
 arcpy.CheckOutExtension("Network")
@@ -33,14 +35,14 @@ def assign_gate(input_network_fc, gate_fc, output_fc):
     - gate_fc: Point feature class with BldgID
     - output_fc: Output merged feature class (e.g., add_edges)
     """
-    arcpy.env.workspace = r"D:/CampusPath/network.gdb"
+    arcpy.env.workspace = r"D:\CampusPath\network.gdb"
     arcpy.env.overwriteOutput = True
 
     # 1. Get spatial reference
     spatial_ref = arcpy.Describe(gate_fc).spatialReference
 
     # 2. Create an in-memory feature class for gate-to-gate edges
-    gate_edges_fc = "memory/gate_edges"
+    gate_edges_fc = "memory\gate_edges"
     
     # Delete the feature class if it already exists to avoid conflicts
     if arcpy.Exists(gate_edges_fc):
@@ -76,7 +78,7 @@ def assign_gate(input_network_fc, gate_fc, output_fc):
                     cursor.insertRow([line, 1])
 
     # 6. Copy input network and assign "internal"=0
-    temp_fc = "memory/temp_network"
+    temp_fc = "memory\temp_network"
     arcpy.management.CopyFeatures(input_network_fc, temp_fc)
 
     # Add the "internal" field if it doesn't exist
@@ -115,7 +117,7 @@ def assign_slope(edge_fc, slope_fc, output_fc, slope_field="slope"):
     - output_fc: Output feature class to store updated edges
     - slope_field: Name of the field to assign slope values (default = 'slope')
     """
-    arcpy.env.workspace = r"D:/CampusPath/network.gdb"
+    arcpy.env.workspace = r"D:\CampusPath\network.gdb"
     arcpy.env.overwriteOutput = True
 
     # 1: Copy the input edge_fc to output_fc
@@ -180,9 +182,9 @@ def assign_shade(edge_fc, dsm_raster, output_fc, azimuth=247, altitude=36, shade
     - output_fc: Output feature class with shade field added
     - azimuth: Sun azimuth (default=247)
     - altitude: Sun angle altitude (default=36)
-    - shade_field: Name of the field to be added/updated (default='shade')
+    - shade_field: Name of the field to be added\updated (default='shade')
     """
-    arcpy.env.workspace = r"D:/CampusPath/network.gdb"
+    arcpy.env.workspace = r"D:\CampusPath\network.gdb"
     arcpy.env.overwriteOutput = True
     arcpy.CheckOutExtension("Spatial")
 
@@ -201,7 +203,7 @@ def assign_shade(edge_fc, dsm_raster, output_fc, azimuth=247, altitude=36, shade
     shadow_mask = Con(hillshade_raster == 0, 1)
 
     # 3. Convert the mask to a polygon
-    shadow_poly = "memory/shade_polygon"
+    shadow_poly = "memory\shade_polygon"
     arcpy.conversion.RasterToPolygon(
         in_raster=shadow_mask,
         out_polygon_features=shadow_poly,
@@ -218,7 +220,7 @@ def assign_shade(edge_fc, dsm_raster, output_fc, azimuth=247, altitude=36, shade
         arcpy.management.AddField(output_fc, shade_field, "SHORT")
 
     # 6. Perform spatial join: output edges ∩ shadow polygon
-    shadow_joined = "memory/shadow_joined"
+    shadow_joined = "memory\shadow_joined"
     arcpy.analysis.SpatialJoin(
         target_features=output_fc,
         join_features=shadow_poly,
@@ -282,7 +284,7 @@ def run_impedance_route(
     Parameters:
     - workspace_gdb: Path to geodatabase
     - input_fc_name: Name of edge feature class
-    - use_slope, use_shade, use_gate: Whether to apply slope/shade/gate preferences
+    - use_slope, use_shade, use_gate: Whether to apply slope\shade\gate preferences
     - slope_weight, shade_weight, gate_weight: Preference weights (0 to 1)
     - start_point, end_point: Tuple (X, Y) coordinates
     - output_fc: Name of output route feature class
@@ -342,11 +344,11 @@ def run_impedance_route(
     arcpy.na.BuildNetwork(network_dataset)
 
     # Create route layer
-    route_layer = "in_memory/RouteLayer"
+    route_layer = "in_memory\RouteLayer"
     arcpy.na.MakeRouteAnalysisLayer(network_dataset, route_layer, "Impedance")
 
     # Create Stops in memory
-    stops_fc = "in_memory/Stops"
+    stops_fc = "in_memory\Stops"
     if arcpy.Exists(stops_fc):
         arcpy.management.Delete(stops_fc)
     arcpy.management.CreateFeatureclass("in_memory", "Stops", "POINT", spatial_reference=4326)
@@ -365,7 +367,7 @@ def run_impedance_route(
         result_path = os.path.join(workspace_gdb, output_fc)
         if arcpy.Exists(result_path):
             arcpy.management.Delete(result_path)
-        arcpy.management.CopyFeatures(f"{route_layer}/Routes", result_path)
+        arcpy.management.CopyFeatures(f"{route_layer}\Routes", result_path)
         print(f"✅ Route saved to: {result_path}")
     except Exception as e:
         print(f"❌ Route solve failed: {e}")
