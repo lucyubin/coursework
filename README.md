@@ -5,10 +5,10 @@ This repository contains Python and R code used in coursework. The projects focu
 
 ## 1. 🚴🏻‍♀️ Human Mobility Analysis
 
-Human mobility pattern analysis using a variety of methods and data sources. A research paper was also written based on the 7361 final project. For more details, see the [2025-MetroBike Project](https://github.com/lucyubin/research/tree/main/2025-MetroBike)
+Human mobility pattern analysis using a variety of methods and data sources. A research paper was also written based on the GEO 7361 *(Advanced Geographic Information Systems)* final project. For more details, see the [2025-MetroBike Project](https://github.com/lucyubin/research/tree/main/2025-MetroBike)
 <br/>
-- Data: New York taxi OD, Austin MetroBike OD data
-- Methods: API integration, JSON data parsing, Entropy, Dynamic Time Warping (DTW), Community detection, GWR
+- **Data**: New York taxi OD, Austin MetroBike OD data
+- **Methods**: API integration, JSON data parsing, Entropy, Dynamic Time Warping (DTW), Community detection, GWR
 
 | Year | Course | Description |
 |------|---------|-------------|
@@ -16,17 +16,17 @@ Human mobility pattern analysis using a variety of methods and data sources. A r
 
 <br/>
 
-## 2. 🏥 *CampusPath*: ArcGIS Pro Toolbox
+## 2. 🚶🏻‍♀️ *CampusPath*: ArcGIS Pro Toolbox
 
-Developed an ArcGIS Pro toolbox named *CampusPath*, designed to find optimized walking routes on campus by considering shade, slope, and indoor accessibility. I led the project in ideation, research design, and Python coding.
+Developed an ArcGIS Pro toolbox named *CampusPath*, in the GEO 7419 class *(Advanced Techniques in Geographic Information Science)*, designed to find optimized walking routes on campus by considering shade, slope, and indoor accessibility. I led the project in ideation, research design, and Python coding.
 <br/>
 
 - **Data**: OpenStreetMap (OSM) street network, building entrance points, slope lines, and DSM raster data  
 - **Methods**: Hillshade analysis, ArcGIS toolbox development, weighted shortest path network analysis
 
-| Year | Project | Description |
+| Year | Course  | Description |
 |------|---------|-------------|
-| 2025 | [CampusPath](./2025-spring/7419) | A custom ArcGIS Pro toolbox for shortest path analysis on the Texas State University campus, considering indoor access points, slope, and shaded areas. |
+| 2025 | [7419](./2025-spring/7419) | A custom ArcGIS Pro toolbox for shortest path analysis on the Texas State University campus, considering indoor access points, slope, and shaded areas. |
 
 <br/>
 
